@@ -14,38 +14,35 @@ module RedmineInvolvementFilter
       available_filters_without_involvement
 
       if User.current.logged?
-        @available_filters["involvement"] = {
-          :name => l('field_involvement'),
-          :type => :list,
-          :values => [[l(:text_involved), "1"]],
-          :order => 4  # places it next to the Assignee filter
-        }
+        filter = @available_filters['involved_user_id'] = @available_filters['assigned_to_id'].dup
+        filter[:name] = l('field_involved_users')
+        filter[:type] = :list
       end
 
       @available_filters
     end
 
-    def sql_for_involvement_field(field, operator, value)
-      uid = User.current.id
+    def sql_for_involved_user_id_field(field, operator, value)
+      value.push(User.current.id.to_s) if value.delete("me") && User.current.logged?
+      user_ids = '(' + value.map(&:to_i).join(',') + ')'
+
       if operator == '='
-        op = '='
         inop = 'IN'
-        whereop = 'OR'
+        cond = 'OR'
       else
-        op = '<>'
         inop = 'NOT IN'
-        whereop = 'AND'
+        cond = 'AND'
       end
 
-      ids_sql = %(
+      issue_ids_sql = %(
 SELECT DISTINCT journalized_id
   FROM #{Journal.table_name}
  WHERE journalized_type='Issue'
-   AND user_id #{op} #{uid}
+   AND user_id IN #{user_ids}
 )
-      sql = ["#{Issue.table_name}.assigned_to_id #{op} #{uid}",
-             "#{Issue.table_name}.author_id #{op} #{uid}",
-             "#{Issue.table_name}.id #{inop} (#{ids_sql})"].join(" #{whereop} ")
+      sql = ["#{Issue.table_name}.assigned_to_id #{inop} #{user_ids}",
+             "#{Issue.table_name}.author_id #{inop} #{user_ids}",
+             "#{Issue.table_name}.id #{inop} (#{issue_ids_sql})"].join(" #{cond} ")
 
       "(#{sql})"
     end
