@@ -1,5 +1,5 @@
 module RedmineInvolvementFilter
-  module QueryPatch
+  module IssueQueryPatch
     unloadable
 
     def self.included(base)
